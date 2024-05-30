@@ -118,8 +118,8 @@ public class WelcomeController extends Controller {
             if (args[1].equals("欢迎词")) {
                 if(args.length >= 3){
                     args = Arrays.copyOfRange(args, 2, args.length);
-                    String anwser = String.join("",args);
-
+                    // 空格在切割参数的时候被去掉了, 在拼接时需要补上
+                    String anwser = String.join(" ",args);
                     WelcomeConfig.INSTANCE.getGroupWelcomeScripts().put(event.getSubject().getId(), anwser);
                     event.getSubject().sendMessage("修改成功"); // 回复消息
                 }

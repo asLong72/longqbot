@@ -127,7 +127,8 @@ public class QAController extends Controller {
             }
 
             if(QAConfig.INSTANCE.getQaMap().getOrDefault(args[1], null)==null){
-                String anwser = String.join("", Arrays.copyOfRange(args, 2, args.length));
+                // 空格在切割参数的时候被去掉了, 在拼接时需要补上
+                String anwser = String.join(" ", Arrays.copyOfRange(args, 2, args.length));
                 Integer key = QAConfig.INSTANCE.getTipsMap().size();
                 QAConfig.INSTANCE.getTipsMap().put(key, args[1]);
                 QAConfig.INSTANCE.getQaMap().put(args[1], anwser);
@@ -189,7 +190,7 @@ public class QAController extends Controller {
                 qustion = args[1];
             }
             args = Arrays.copyOfRange(args, 2, args.length);
-            String anwser = String.join("",args);
+            String anwser = String.join(" ",args);
             QAConfig.INSTANCE.getQaMap().put(qustion, anwser);
             event.getSubject().sendMessage("修改成功"); // 回复消息s
         }
@@ -200,6 +201,7 @@ public class QAController extends Controller {
         }
     }
 
+    // 删除词条
     void remove(GroupMessageEvent event, String[] args) {
         if(BasicConfig.INSTANCE.getGroupWhiteList().getOrDefault(event.getSubject().getId(), null) == null)
         {
@@ -210,7 +212,7 @@ public class QAController extends Controller {
             return;
         }
 
-        event.getSubject().sendMessage("文件层面记录删除暂未实现"); // 回复消息
+        event.getSubject().sendMessage("文件层面记录删除暂不可用, 请使用'#问答 禁用 <编号>'以在本群移除对应词条"); // 回复消息
 
     }
 
