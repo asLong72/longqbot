@@ -1,10 +1,12 @@
 package site.longint.controller.impl;
 
+import net.mamoe.mirai.event.Event;
 import net.mamoe.mirai.event.events.GroupMessageEvent;
 import net.mamoe.mirai.message.data.PlainText;
 import site.longint.Longqbot;
 import site.longint.configs.BasicConfig;
 import site.longint.configs.QAConfig;
+import site.longint.configs.WelcomeConfig;
 import site.longint.controller.Controller;
 import site.longint.utils.MethodPointerUtil;
 import site.longint.utils.PermissionUtil;
@@ -23,11 +25,10 @@ public class QAController extends Controller {
     }
 
     void register() {
+        subFuncs = new LinkedHashMap<>();
         try {
-            subFuncs = new LinkedHashMap<>();
-
 //            subFuncs.put("测试", MethodPointerUtil.getMethodwithTwoParams(INSTANCE, "test", GroupMessageEvent.class, String[].class));
-            subFuncs.put("功能介绍", MethodPointerUtil.getMethodwithTwoParams(INSTANCE, "info", GroupMessageEvent.class, String[].class));
+            subFuncs.put("功能介绍", MethodPointerUtil.getMethodwithTwoParams(INSTANCE, "info", Event.class, String[].class));
             subFuncs.put("添加", MethodPointerUtil.getMethodwithTwoParams(INSTANCE, "add", GroupMessageEvent.class, String[].class));
             subFuncs.put("修改", MethodPointerUtil.getMethodwithTwoParams(INSTANCE, "edit", GroupMessageEvent.class, String[].class));
             subFuncs.put("删除", MethodPointerUtil.getMethodwithTwoParams(INSTANCE, "remove", GroupMessageEvent.class, String[].class));
@@ -35,12 +36,6 @@ public class QAController extends Controller {
             subFuncs.put("禁用", MethodPointerUtil.getMethodwithTwoParams(INSTANCE, "ban", GroupMessageEvent.class, String[].class));
             subFuncs.put("列表", MethodPointerUtil.getMethodwithTwoParams(INSTANCE, "list", GroupMessageEvent.class, String[].class));
             subFuncs.put("条目", MethodPointerUtil.getMethodwithTwoParams(INSTANCE, "quest", GroupMessageEvent.class, String[].class));
-
-            for(String subFuncName: subFuncs.keySet()){
-                if(QAConfig.INSTANCE.getFuncsDiscription().getOrDefault(subFuncName, null)==null){
-                    QAConfig.INSTANCE.getFuncsDiscription().put(subFuncName, "暂无详细描述");
-                }
-            }
 //                Longqbot.INSTANCE.getLogger().info(String.valueOf(subFuncs.size()));
         } catch (Exception e) {
             Longqbot.INSTANCE.getLogger().error(e);
@@ -48,12 +43,15 @@ public class QAController extends Controller {
     }
 
     @Override
-    public void onCall(GroupMessageEvent event, String[] args) {
+    public void onCall(Event event, String[] args) {
         if (subFuncs == null) {
             Longqbot.INSTANCE.getLogger().warning(keyword + ": subFuncs is null");
             register();
         }
 
+//        if(event instanceof GroupMessageEvent){
+//
+//        }
         if (args != null && args.length != 0) {
 //            Longqbot.INSTANCE.getLogger().info(args[0]);
 
@@ -73,21 +71,27 @@ public class QAController extends Controller {
             else
             {
 //                Longqbot.INSTANCE.getLogger().info(args[0]);
-                quest(event, args);
+                quest((GroupMessageEvent)event, args);
             }
         } else {
-            String help = QAController.INSTANCE.getKeyword() + "功能介绍: ";
-            for (String funcName : subFuncs.keySet()) {
-                String discription = QAConfig.INSTANCE.getFuncsDiscription().getOrDefault(funcName, "");
-                help += "\n" + funcName + ": " + discription;
-            }
-            event.getSubject().sendMessage(help); // 回复消息
+            info(event, args);
         }
     }
 
     @Override
-    public void info(GroupMessageEvent event, String[] args){
-
+    public void info(Event event, String[] args){
+        String help = QAController.INSTANCE.getKeyword() + "功能介绍: ";
+        for (String subFuncName : subFuncs.keySet()) {
+            String discription;
+            if(QAConfig.INSTANCE.getFuncsDiscription().getOrDefault(subFuncName, null)==null){
+                discription = "暂无详细描述";
+                QAConfig.INSTANCE.getFuncsDiscription().put(subFuncName, discription);
+            }else{
+                discription = QAConfig.INSTANCE.getFuncsDiscription().getOrDefault(subFuncName, "");
+            }
+            help += "\n" + subFuncName + ": " + discription;
+        }
+        ((GroupMessageEvent)event).getSubject().sendMessage(help); // 回复消息
     }
 
     public void test(GroupMessageEvent event, String[] args) {
@@ -111,7 +115,6 @@ public class QAController extends Controller {
         }
 
         if (args.length >= 3) {
-//            event.getSubject().sendMessage(String.join(" ", args)); // 回复消息
             // 浅复制对象, 引用对象
             if (QAConfig.INSTANCE.getTipsMap() == null) {
                 Longqbot.INSTANCE.getLogger().warning("tipsMap is null");
@@ -123,22 +126,27 @@ public class QAController extends Controller {
                 QAConfig.INSTANCE.setQaMap(new LinkedHashMap<>());
             }
 
-            String anwser = String.join("", Arrays.copyOfRange(args, 2, args.length));
-            Integer key = QAConfig.INSTANCE.getTipsMap().size();
-            QAConfig.INSTANCE.getTipsMap().put(key, args[1]);
-            QAConfig.INSTANCE.getQaMap().put(args[1], anwser);
-            if (QAConfig.INSTANCE.getTipsAllowinGroup().get(event.getSubject().getId()) == null)
-            {
-                Longqbot.INSTANCE.getLogger().warning("tipsAllowinGroup is null");
-                QAConfig.INSTANCE.getTipsAllowinGroup().put(event.getSubject().getId(),new LinkedHashMap<>());
-            }
-            QAConfig.INSTANCE.getTipsAllowinGroup().get(event.getSubject().getId()).put(key, args[1]);
+            if(QAConfig.INSTANCE.getQaMap().getOrDefault(args[1], null)==null){
+                String anwser = String.join("", Arrays.copyOfRange(args, 2, args.length));
+                Integer key = QAConfig.INSTANCE.getTipsMap().size();
+                QAConfig.INSTANCE.getTipsMap().put(key, args[1]);
+                QAConfig.INSTANCE.getQaMap().put(args[1], anwser);
+                if (QAConfig.INSTANCE.getTipsAllowinGroup().get(event.getSubject().getId()) == null)
+                {
+                    Longqbot.INSTANCE.getLogger().warning("tipsAllowinGroup is null");
+                    QAConfig.INSTANCE.getTipsAllowinGroup().put(event.getSubject().getId(),new LinkedHashMap<>());
+                }
+                QAConfig.INSTANCE.getTipsAllowinGroup().get(event.getSubject().getId()).put(key, args[1]);
 
-            event.getSubject().sendMessage(String.format("问题[%s]添加成功, 序号: %d", args[1], key));
+                event.getSubject().sendMessage(String.format("问题<[%s]>添加成功, 序号: %d", args[1], key));
+            }else{
+                Integer key = QAConfig.INSTANCE.getTipsMap().size();
+                event.getSubject().sendMessage(String.format("问题<[%s]>已存在, 序号: %d", args[1], key));
+            }
         }
         else
         {
-            event.getSubject().sendMessage("格式: #问答 添加 问题名称 答案"); // 回复消息
+            event.getSubject().sendMessage("格式: #问答 添加 <问题名称> <答案>"); // 回复消息
         }
 //        Integer SpecialState = usersSpecialState.get(event.getSender().getId());
 //        if (SpecialState == null){
@@ -229,11 +237,14 @@ public class QAController extends Controller {
             String question = QAConfig.INSTANCE.getTipsAllowinGroup().get(event.getSubject().getId()).getOrDefault(keyID, null);
             String anwser = QAConfig.INSTANCE.getQaMap().get(question);
             if(anwser != null){
+                anwser = "["+ question +"]\n\n" + anwser;
                 event.getSubject().sendMessage(new PlainText(anwser)); // 回复消息
+            }else{
+                event.getSubject().sendMessage("所请求问题的答案数据异常"); // 回复消息
             }
         }catch (NumberFormatException e){
             if(args[0].charAt(0)=='#'||args[0].charAt(0)=='＃'){
-                event.getSubject().sendMessage("格式有误, 相近的指令（获取问答答案）正确格式为: #数字"); // 回复消息
+                event.getSubject().sendMessage("格式有误, 与您发出的指令相近的正确格式（获取问答答案）为: #数字"); // 回复消息
             }else{
                 for(Integer key: QAConfig.INSTANCE.getTipsMap().keySet()){
                     String question = QAConfig.INSTANCE.getTipsMap().getOrDefault(key,null);
@@ -242,7 +253,10 @@ public class QAController extends Controller {
                             QAConfig.INSTANCE.getTipsAllowinGroup().put(event.getSubject().getId(), new LinkedHashMap<>());
                         }
                         if(QAConfig.INSTANCE.getTipsAllowinGroup().get(event.getSubject().getId()).getOrDefault(key, null)!=null){
-                            event.getSubject().sendMessage(QAConfig.INSTANCE.getQaMap().get(question)); // 回复消息
+                            String msg="";
+                            msg+= String.format("[%s]\n\n", question);
+                            msg+=QAConfig.INSTANCE.getQaMap().get(question);
+                            event.getSubject().sendMessage(new PlainText(msg)); // 回复消息
                             break;
                         }
                     }

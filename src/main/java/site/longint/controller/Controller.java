@@ -1,6 +1,7 @@
 package site.longint.controller;
 
 import net.mamoe.mirai.console.plugin.Plugin;
+import net.mamoe.mirai.event.Event;
 import net.mamoe.mirai.event.events.GroupMessageEvent;
 
 import java.lang.reflect.Method;
@@ -25,8 +26,8 @@ public abstract class Controller {
         enable = false;
     }
 
-    public abstract void onCall(GroupMessageEvent event, String[] arg);
-    public abstract void info(GroupMessageEvent event, String[] args);
+    public abstract void onCall(Event event, String[] arg);
+    public abstract void info(Event event, String[] args);
 
     public Plugin getPlugin(){
         return plugin;

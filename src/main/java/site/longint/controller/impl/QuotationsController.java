@@ -1,5 +1,6 @@
 package site.longint.controller.impl;
 
+import net.mamoe.mirai.event.Event;
 import net.mamoe.mirai.event.events.GroupMessageEvent;
 import net.mamoe.mirai.message.data.Image;
 import net.mamoe.mirai.message.data.ImageType;
@@ -54,7 +55,7 @@ public class QuotationsController extends Controller {
     }
 
     @Override
-    public void onCall(GroupMessageEvent event, String[] args) {
+    public void onCall(Event event, String[] args) {
         if (subFuncs == null) {
             Longqbot.INSTANCE.getLogger().warning(keyword + ": subFuncs is null");
             register();
@@ -79,7 +80,7 @@ public class QuotationsController extends Controller {
             else
             {
                 Longqbot.INSTANCE.getLogger().info(args[0]);
-                query(event, args);
+                query(((GroupMessageEvent)event), args);
             }
         } else {
             String help = QuotationsController.INSTANCE.getKeyword() + "功能介绍: ";
@@ -87,13 +88,13 @@ public class QuotationsController extends Controller {
                 String discription = QuotationConfig.INSTANCE.getFuncsDiscription().getOrDefault(funcName, "");
                 help += "\n" + funcName + ": " + discription;
             }
-            event.getSubject().sendMessage(help); // 回复消息
+            ((GroupMessageEvent)event).getSubject().sendMessage(help); // 回复消息
         }
 
     }
 
     @Override
-    public void info(GroupMessageEvent event, String[] args){
+    public void info(Event event, String[] args){
 
     }
 

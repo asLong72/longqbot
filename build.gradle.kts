@@ -14,7 +14,7 @@ dependencies {
 }
 
 group = "site.longint"
-version = "1.0-SNAPSHOT"
+version = "1.1-welcome"
 
 repositories {
     maven("https://maven.aliyun.com/repository/public")

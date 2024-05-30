@@ -5,6 +5,7 @@ import net.mamoe.mirai.console.command.CommandManager;
 import net.mamoe.mirai.console.data.AutoSavePluginConfig;
 import net.mamoe.mirai.console.plugin.jvm.JavaPlugin;
 import net.mamoe.mirai.console.plugin.jvm.JvmPluginDescriptionBuilder;
+import net.mamoe.mirai.event.Event;
 import net.mamoe.mirai.event.GlobalEventChannel;
 import net.mamoe.mirai.event.events.GroupMessageEvent;
 import net.mamoe.mirai.event.events.MemberJoinEvent;
@@ -13,14 +14,12 @@ import net.mamoe.mirai.message.data.MessageChain;
 import net.mamoe.mirai.message.data.PlainText;
 import site.longint.command.DailyNewsCommand;
 import site.longint.command.QACommand;
-import site.longint.configs.BasicConfig;
-import site.longint.configs.LOLConfig;
-import site.longint.configs.QAConfig;
-import site.longint.configs.QuotationConfig;
+import site.longint.configs.*;
 import site.longint.controller.Controller;
 import site.longint.controller.impl.LOLController;
 import site.longint.controller.impl.QAController;
 import site.longint.controller.impl.QuotationsController;
+import site.longint.controller.impl.WelcomeController;
 
 import java.io.File;
 import java.util.*;
@@ -65,6 +64,7 @@ public final class Longqbot extends JavaPlugin {
         configs.put("问答",QAConfig.INSTANCE);
         configs.put("lol",LOLConfig.INSTANCE);
         configs.put("经典", QuotationConfig.INSTANCE);
+        configs.put("欢迎", WelcomeConfig.INSTANCE);
         for (AutoSavePluginConfig cfg : configs.values()) {
             INSTANCE.reloadPluginConfig(cfg);
         }
@@ -79,9 +79,11 @@ public final class Longqbot extends JavaPlugin {
 
         // enable controller
         getLogger().info("controllers loading");
+        // funcs.put(Keyword, Controller INSTANCE);
         funcs.put(QAController.INSTANCE.getKeyword(), QAController.INSTANCE);
         funcs.put(LOLController.INSTANCE.getKeyword(), LOLController.INSTANCE);
         funcs.put(QuotationsController.INSTANCE.getKeyword(), QuotationsController.INSTANCE);
+        funcs.put(WelcomeController.INSTANCE.getKeyword(), WelcomeController.INSTANCE);
         LinkedHashMap<String, Boolean> funcsState = new LinkedHashMap<>(BasicConfig.INSTANCE.getFunctionLoad());
         for (String funcKeyword : funcs.keySet()) {
             funcs.get(funcKeyword).setEnable(funcsState.getOrDefault(funcKeyword, false));
@@ -110,11 +112,9 @@ public final class Longqbot extends JavaPlugin {
 
     void GroupJoinListener(MemberJoinEvent event){
         if (BasicConfig.INSTANCE.getGroupEnable().getOrDefault(event.getGroupId(), false)) {
+            String args[] = {"欢迎", "欢迎"};
+            callFunc(event, args);
 //            MessageChain chain = event.getMessage(); // 可获取到消息内容等, 详细查阅 `GroupMessageEvent`
-            if(BasicConfig.INSTANCE.getGroupWelcomeScripts().getOrDefault(event.getGroupId(),null)==null){
-                BasicConfig.INSTANCE.getGroupWelcomeScripts().put(event.getGroupId(), "\n欢迎进群, 输入 #帮助 获得本QQbot在本群的功能启用情况与使用说明");
-            }
-            event.getGroup().sendMessage(new At(event.getMember().getId()).plus(new PlainText(BasicConfig.INSTANCE.getGroupWelcomeScripts().get(event.getGroupId()))));
         }
     }
 
@@ -125,6 +125,8 @@ public final class Longqbot extends JavaPlugin {
         String msg = chain.contentToString();
         if (BasicConfig.INSTANCE.getGroupEnable().getOrDefault(event.getSubject().getId(), false)) {
 //            event.getSubject().sendMessage("Hello!"); // 回复消息
+            String[] args = {"欢迎", "冷却"};
+            callFunc(event,args);
             char first = msg.charAt(0);
             if(first == '#'||first == '＃'){
                 if(first == '#'){
@@ -132,7 +134,8 @@ public final class Longqbot extends JavaPlugin {
                 }else{
                     msg = msg.replaceFirst("＃", "");
                 }
-                String[] args = msg.split(" ");
+                args = msg.split(" ");
+//                Longqbot.INSTANCE.getLogger().warning(args[0]);
                 if(callFunc(event,args)==Boolean.FALSE && args.length == 1)
                 {
                     if(msg.equals("帮助"))
@@ -230,7 +233,7 @@ public final class Longqbot extends JavaPlugin {
             {
                 if(msg.equals("列表"))
                 {
-                    String[] args = {"问答", msg};
+                    args = new String[]{"问答", msg};
                     callFunc(event,args);
                 }
                 else if(msg.equals("取消"))
@@ -239,12 +242,12 @@ public final class Longqbot extends JavaPlugin {
                 }
                 else if(QAConfig.INSTANCE.getQaMap().getOrDefault(msg, null)!=null)
                 {
-                    String[] args = {"问答", msg};
+                    args = new String[]{"问答", msg};
                     callFunc(event,args);
                 }
             }
         }
-        //
+        // 超级管理指令处理
         if (event.getSender().getId() == BasicConfig.INSTANCE.getSuperAdmin()) {
             if (msg.equals("!原神!") && !BasicConfig.INSTANCE.getGroupEnable().getOrDefault(event.getSubject().getId(), false)) {
                 BasicConfig.INSTANCE.getGroupEnable().put(event.getSubject().getId(), true);
@@ -266,21 +269,30 @@ public final class Longqbot extends JavaPlugin {
         }
     }
 
-    Boolean callFunc(GroupMessageEvent event, String[] args){
+    Boolean callFunc(Event event, String[] args){
 //        Longqbot.INSTANCE.getLogger().warning(args[0]);
 
-        if (BasicConfig.INSTANCE.getGroupWhiteList().getOrDefault(event.getSubject().getId(),null) == null)
+        Long subjectID = null;
+        if(event instanceof GroupMessageEvent){
+            subjectID = ((GroupMessageEvent)event).getSubject().getId();
+        }else if(event instanceof MemberJoinEvent){
+            subjectID = ((MemberJoinEvent)event).getGroupId();
+        }
+
+        if (event instanceof GroupMessageEvent && BasicConfig.INSTANCE.getGroupWhiteList().getOrDefault(((GroupMessageEvent)event).getSubject().getId(),null) == null)
         {
-            BasicConfig.INSTANCE.getGroupWhiteList().put(event.getSubject().getId(), new LinkedHashMap<>());
+            BasicConfig.INSTANCE.getGroupWhiteList().put(((GroupMessageEvent)event).getSubject().getId(), new LinkedHashMap<>());
         }
 
         Controller funcOnCall = funcs.getOrDefault(args[0], null);
+//        Longqbot.INSTANCE.getLogger().warning("func name: " + args[0]);
         // && BasicConfig.INSTANCE.getFunctionLoad().getOrDefault(args[0],true)
-        if(funcOnCall!=null && BasicConfig.INSTANCE.getGroupWhiteList().get(event.getSubject().getId()).getOrDefault(args[0], 0)>0){
+        if(funcOnCall!=null && BasicConfig.INSTANCE.getGroupWhiteList().get(subjectID).getOrDefault(args[0], 0)>0){
             args = Arrays.copyOfRange(args, 1, args.length);
             funcOnCall.onCall(event, args);
             return Boolean.TRUE;
         }else {
+//            Longqbot.INSTANCE.getLogger().warning("func is null, func name: " + args[0]);
             return Boolean.FALSE;
         }
     }

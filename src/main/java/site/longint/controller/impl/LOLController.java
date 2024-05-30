@@ -1,5 +1,6 @@
 package site.longint.controller.impl;
 
+import net.mamoe.mirai.event.Event;
 import net.mamoe.mirai.event.events.GroupMessageEvent;
 import net.mamoe.mirai.message.data.*;
 import site.longint.Longqbot;
@@ -43,9 +44,9 @@ public class LOLController extends Controller {
     }
 
     @Override
-    public void onCall(GroupMessageEvent event, String[] args) {
-        if(LOLConfig.INSTANCE.getGroupSet().getOrDefault(event.getSubject().getId(), null) == null){
-            LOLConfig.INSTANCE.getGroupSet().put(event.getSubject().getId(), new LinkedHashMap<String,Boolean>());
+    public void onCall(Event event, String[] args) {
+        if(LOLConfig.INSTANCE.getGroupSet().getOrDefault(((GroupMessageEvent)event).getSubject().getId(), null) == null){
+            LOLConfig.INSTANCE.getGroupSet().put(((GroupMessageEvent)event).getSubject().getId(), new LinkedHashMap<String,Boolean>());
         }
 
         if(subFuncs == null) {
@@ -76,7 +77,7 @@ public class LOLController extends Controller {
     }
 
     @Override
-    public void info(GroupMessageEvent event, String[] args) {
+    public void info(Event event, String[] args) {
 
     }
 
