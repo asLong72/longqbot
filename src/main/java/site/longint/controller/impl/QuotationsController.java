@@ -83,19 +83,24 @@ public class QuotationsController extends Controller {
                 query(((GroupMessageEvent)event), args);
             }
         } else {
-            String help = QuotationsController.INSTANCE.getKeyword() + "功能介绍: ";
-            for (String funcName : subFuncs.keySet()) {
-                String discription = QuotationConfig.INSTANCE.getFuncsDiscription().getOrDefault(funcName, "");
-                help += "\n" + funcName + ": " + discription;
-            }
-            ((GroupMessageEvent)event).getSubject().sendMessage(help); // 回复消息
+            info(event, args);
         }
-
     }
 
     @Override
     public void info(Event event, String[] args){
-
+        String help = QuotationsController.INSTANCE.getKeyword() + "功能介绍: ";
+        for (String subFuncName : subFuncs.keySet()) {
+            String discription;
+            if(QuotationConfig.INSTANCE.getFuncsDiscription().getOrDefault(subFuncName, null)==null){
+                discription = "暂无详细描述";
+                QuotationConfig.INSTANCE.getFuncsDiscription().put(subFuncName, discription);
+            }else{
+                discription = QuotationConfig.INSTANCE.getFuncsDiscription().getOrDefault(subFuncName, "");
+            }
+            help += "\n" + subFuncName + ": " + discription;
+        }
+        ((GroupMessageEvent)event).getSubject().sendMessage(help); // 回复消息
     }
 
     void test(GroupMessageEvent event, String[] args) {

@@ -10,7 +10,7 @@ import java.util.TimerTask;
 
 public class MassageUtil {
     // 0.2 second
-    static Long basicDelay = new Long(200);
+    static Long basicDelay = 200L;
     static void sendDelay(String msg, Event event){
         Timer timer = new Timer();
         timer.schedule(new TimerTask() {

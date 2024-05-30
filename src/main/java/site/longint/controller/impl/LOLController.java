@@ -72,13 +72,24 @@ public class LOLController extends Controller {
 
             }
         } else {
-
+            info(event, args);
         }
     }
 
     @Override
     public void info(Event event, String[] args) {
-
+        String help = LOLController.INSTANCE.getKeyword() + "功能介绍: ";
+        for (String subFuncName : subFuncs.keySet()) {
+            String discription;
+            if(LOLConfig.INSTANCE.getFuncsDiscription().getOrDefault(subFuncName, null)==null){
+                discription = "暂无详细描述";
+                LOLConfig.INSTANCE.getFuncsDiscription().put(subFuncName, discription);
+            }else{
+                discription = LOLConfig.INSTANCE.getFuncsDiscription().getOrDefault(subFuncName, "");
+            }
+            help += "\n" + subFuncName + ": " + discription;
+        }
+        ((GroupMessageEvent)event).getSubject().sendMessage(help); // 回复消息
     }
 
     void test(GroupMessageEvent event, String[] args){
