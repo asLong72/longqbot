@@ -10,5 +10,5 @@ object WelcomeConfig: AutoSavePluginConfig("WelcomeConfig") {
     @ValueDescription("disableScripts: 群迎新台词")
     val groupWelcomeScripts: Map<Long,String> by value()
     @ValueDescription("disableScripts: 群迎新cd")
-    val groupWelcomeCoolDown: Map<Long,Int> by value()
+    val groupWelcomeCoolDownTarget: Map<Long,Int> by value()
 }

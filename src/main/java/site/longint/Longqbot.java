@@ -3,7 +3,9 @@ package site.longint;
 import net.mamoe.mirai.console.command.Command;
 import net.mamoe.mirai.console.command.CommandManager;
 import net.mamoe.mirai.console.data.AutoSavePluginConfig;
+import net.mamoe.mirai.console.extension.PluginComponentStorage;
 import net.mamoe.mirai.console.plugin.jvm.JavaPlugin;
+import net.mamoe.mirai.console.plugin.jvm.JvmPluginDescription;
 import net.mamoe.mirai.console.plugin.jvm.JvmPluginDescriptionBuilder;
 import net.mamoe.mirai.event.Event;
 import net.mamoe.mirai.event.GlobalEventChannel;
@@ -12,16 +14,16 @@ import net.mamoe.mirai.event.events.MemberJoinEvent;
 import net.mamoe.mirai.message.data.At;
 import net.mamoe.mirai.message.data.MessageChain;
 import net.mamoe.mirai.message.data.PlainText;
+import org.apache.commons.exec.util.StringUtils;
+import org.jetbrains.annotations.NotNull;
 import site.longint.command.DailyNewsCommand;
 import site.longint.command.QACommand;
 import site.longint.configs.*;
 import site.longint.controller.Controller;
-import site.longint.controller.impl.LOLController;
-import site.longint.controller.impl.QAController;
-import site.longint.controller.impl.QuotationsController;
-import site.longint.controller.impl.WelcomeController;
+import site.longint.controller.impl.*;
 
 import java.io.File;
+import java.nio.file.Paths;
 import java.util.*;
 
 public final class Longqbot extends JavaPlugin {
@@ -32,25 +34,48 @@ public final class Longqbot extends JavaPlugin {
     static LinkedHashMap<String, AutoSavePluginConfig> configs = new LinkedHashMap<>();
     static LinkedHashMap<Long,LinkedHashMap<Long, Integer>> groupMemberState = new LinkedHashMap<>();
 
+    static public String relativeDataFolderPath = "";
+
     private Longqbot() {
+        // @/src/main/resources
+        // https://mirai.mamoe.net/topic/1669/%E6%89%BE%E4%B8%8D%E5%88%B0plugin-yml%E7%9A%84%E9%97%AE%E9%A2%98/20
 //        super(JvmPluginDescription.loadFromResource());
-        super(new JvmPluginDescriptionBuilder("site.longint.longqbot", "1.0-SNAPSHOT")
+        //
+        super(new JvmPluginDescriptionBuilder("site.longint.longqbot", "1.1.17")
                 .name("longqbot")
                 .author("longint72")
                 .build());
     }
 
     @Override
-    public void onEnable() {
-        getLogger().info("plugin on loading");
+    public void onLoad(@NotNull PluginComponentStorage $this$onLoad) {
+        super.onLoad($this$onLoad);
+    }
 
-        // basic folder check
-        String path = Longqbot.INSTANCE.getDataFolderPath() + "/img";
+    @Override
+    public void onEnable() {
+        Longqbot.INSTANCE.getLogger().info("Longqbot plugin on loading");
+
+        // basic path check
+        // workdir: Disk:/a/b/c
+        // DataFolderPath: Disk:/a/b/c/data/xxx
+        // relative: data/xxx
+        if(System.getProperty("os.name").toUpperCase().contains("WIN")){
+            relativeDataFolderPath = Longqbot.INSTANCE.getDataFolderPath().toString().replace(Paths.get("").toAbsolutePath().toString()+"\\", "");
+            System.setProperty("webdriver.chrome.driver", "F:/AboutPython/Lib/site-packages/chromedriver/chromedriver.exe");
+        }else{
+            relativeDataFolderPath = Longqbot.INSTANCE.getDataFolderPath().toString().replace(Paths.get("").toAbsolutePath().toString()+"/", "");
+            System.setProperty("webdriver.chrome.driver", "F:/AboutPython/Lib/site-packages/chromedriver/chromedriver.exe");
+        }
+        //
+        String path = "";
+        path = Longqbot.INSTANCE.getDataFolderPath() + "/img";
         File file = new File(path);
         if (!file.exists() && !file.isDirectory()) {
             Longqbot.INSTANCE.getLogger().warning("img folder not exist");
             file.mkdir();
         }
+        //
         path = Longqbot.INSTANCE.getDataFolderPath() + "/temp";
         file = new File(path);
         if (!file.exists() && !file.isDirectory()) {
@@ -59,31 +84,40 @@ public final class Longqbot extends JavaPlugin {
         }
 
         // config load
-        getLogger().info("loading configFiles");
+        Longqbot.INSTANCE.getLogger().info("loading configFiles");
+        //1.0
         configs.put("基础",BasicConfig.INSTANCE);
         configs.put("问答",QAConfig.INSTANCE);
         configs.put("lol",LOLConfig.INSTANCE);
         configs.put("经典", QuotationConfig.INSTANCE);
+        //1.1
         configs.put("欢迎", WelcomeConfig.INSTANCE);
+        //1.2
+        configs.put("反广告", AdAntiConfig.INSTANCE);
         for (AutoSavePluginConfig cfg : configs.values()) {
             INSTANCE.reloadPluginConfig(cfg);
         }
 
         // command register
-        getLogger().info("commands loading");
-        commands.add(QACommand.INSTANCE);
-        commands.add(DailyNewsCommand.INSTANCE);
-        for (Command cmd : commands) {
-            CommandManager.INSTANCE.registerCommand(cmd, false);
-        }
+//        Longqbot.INSTANCE.getLogger().info("commands loading");
+//        commands.add(QACommand.INSTANCE);
+//        commands.add(DailyNewsCommand.INSTANCE);
+//        for (Command cmd : commands) {
+//            CommandManager.INSTANCE.registerCommand(cmd, false);
+//        }
 
         // enable controller
-        getLogger().info("controllers loading");
+        Longqbot.INSTANCE.getLogger().info("controllers loading");
         // funcs.put(Keyword, Controller INSTANCE);
+        // 1.0
         funcs.put(QAController.INSTANCE.getKeyword(), QAController.INSTANCE);
         funcs.put(LOLController.INSTANCE.getKeyword(), LOLController.INSTANCE);
         funcs.put(QuotationsController.INSTANCE.getKeyword(), QuotationsController.INSTANCE);
+        // 1.1
         funcs.put(WelcomeController.INSTANCE.getKeyword(), WelcomeController.INSTANCE);
+        // 1.2
+        funcs.put(AdAntiController.INSTANCE.getKeyword(), AdAntiController.INSTANCE);
+        //
         LinkedHashMap<String, Boolean> funcsState = new LinkedHashMap<>(BasicConfig.INSTANCE.getFunctionLoad());
         for (String funcKeyword : funcs.keySet()) {
             funcs.get(funcKeyword).setEnable(funcsState.getOrDefault(funcKeyword, false));
@@ -94,7 +128,7 @@ public final class Longqbot extends JavaPlugin {
         GlobalEventChannel.INSTANCE.parentScope(INSTANCE).subscribeAlways(MemberJoinEvent.class, this::GroupJoinListener);
 
         // finish!
-        getLogger().info("plugin loaded");
+        Longqbot.INSTANCE.getLogger().info("plugin loaded");
     }
 
     @Override
@@ -107,7 +141,7 @@ public final class Longqbot extends JavaPlugin {
         for (AutoSavePluginConfig cfg : configs.values()) {
             INSTANCE.savePluginConfig(cfg);
         }
-        getLogger().info("plugin disabled with saving");
+        Longqbot.INSTANCE.getLogger().info("plugin disabled with saving");
     }
 
     void GroupJoinListener(MemberJoinEvent event){
@@ -127,7 +161,9 @@ public final class Longqbot extends JavaPlugin {
 //            event.getSubject().sendMessage("Hello!"); // 回复消息
             String[] args = {"欢迎", "冷却"};
             callFunc(event,args);
+
             char first = msg.charAt(0);
+//            char last = msg.charAt(msg.length()-1);
             if(first == '#'||first == '＃'){
                 if(first == '#'){
                     msg = msg.replaceFirst("#", "");
@@ -184,16 +220,15 @@ public final class Longqbot extends JavaPlugin {
                         if(args.length == 3){
                             try{
                                 state = Integer.valueOf(args[2]);
-                                if(state<1||state>3){
+                                if(state<1||state>4){
                                     throw new NumberFormatException();
                                 }
                             }catch(NumberFormatException e){
                                 event.getSubject().sendMessage(String.format("数值异常: %s", args[2]));
                                 return;
                             }
-                        } else {
-                            state = 1;
                         }
+
                         if(BasicConfig.INSTANCE.getGroupWhiteList().getOrDefault(event.getSubject().getId(), null) == null){
                             BasicConfig.INSTANCE.getGroupWhiteList().put(event.getSubject().getId(), new LinkedHashMap<>());
                         }
@@ -203,9 +238,9 @@ public final class Longqbot extends JavaPlugin {
                         if(state==1){
                             report += ", 部分功能权限模式为: 仅允许 bot超级管理 \\ 群白名单";
                         }else if(state==2){
-                            report += ", 部分功能权限模式为: 仅允许 群主 \\ bot超级管理 \\ 群白名单";
+                            report += ", 部分功能权限模式为: 仅允许 bot超级管理 \\ 群白名单 \\ 群主";
                         }else if(state==3){
-                            report += ", 部分功能权限模式为: 仅允许 管理员及更高 \\ bot超级管理 \\ 群白名单";
+                            report += ", 部分功能权限模式为: 仅允许 bot超级管理 \\ 群白名单 \\ 管理员及更高";
                         }else if(state==4){
                             report += ", 部分功能权限模式为: 全体成员";
                         }
@@ -231,6 +266,7 @@ public final class Longqbot extends JavaPlugin {
             }
             else
             {
+                //
                 if(msg.equals("列表"))
                 {
                     args = new String[]{"问答", msg};
@@ -244,6 +280,32 @@ public final class Longqbot extends JavaPlugin {
                 {
                     args = new String[]{"问答", msg};
                     callFunc(event,args);
+                }
+                else if(first=='('||first=='（')
+                {
+                    char last = msg.charAt(msg.length()-1);
+//                    Longqbot.INSTANCE.getLogger().warning(String.format("%c", last));
+                    if(last==')'||last=='）'){
+                        // (
+//                        long count=0;
+//                        count = msg.chars().filter(ch -> (ch=='('||ch=='（')).count();
+                        // from a to behind b
+                        msg = msg.substring(1, msg.length()-1);
+//                        Longqbot.INSTANCE.getLogger().warning(msg);
+                        if(!msg.matches("[(（）)]")){
+                            // ?指令关键词冲突
+                            msg = "经典 " + msg;
+//                            Longqbot.INSTANCE.getLogger().warning(msg);
+                            args = msg.split(" ");
+                            List<String> tips = new ArrayList<>();
+                            tips = QuotationConfig.INSTANCE.getTipsAllowinGroup().getOrDefault(event.getSubject().getId(),null);
+                            if(tips!=null){
+                                if(args.length>1 && args[1].length()!=0 && tips.contains(args[1])){
+                                    callFunc(event,args);
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -269,6 +331,7 @@ public final class Longqbot extends JavaPlugin {
         }
     }
 
+    /* 在此callFunc函数内先剔除功能名参数, 再传入功能调用 */
     Boolean callFunc(Event event, String[] args){
 //        Longqbot.INSTANCE.getLogger().warning(args[0]);
 
@@ -288,6 +351,7 @@ public final class Longqbot extends JavaPlugin {
 //        Longqbot.INSTANCE.getLogger().warning("func name: " + args[0]);
         // && BasicConfig.INSTANCE.getFunctionLoad().getOrDefault(args[0],true)
         if(funcOnCall!=null && BasicConfig.INSTANCE.getGroupWhiteList().get(subjectID).getOrDefault(args[0], 0)>0){
+            // !!!
             args = Arrays.copyOfRange(args, 1, args.length);
             funcOnCall.onCall(event, args);
             return Boolean.TRUE;

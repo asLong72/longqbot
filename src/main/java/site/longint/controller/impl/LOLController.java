@@ -28,7 +28,8 @@ public class LOLController extends Controller {
         super("lol", false);
     }
 
-    void register(){
+    @Override
+    protected void register(){
         try {
             subFuncs = new LinkedHashMap<>();
             subFuncs.put("自定义", MethodPointerUtil.getMethodwithTwoParams(INSTANCE, "start",GroupMessageEvent.class,String[].class));
@@ -38,7 +39,7 @@ public class LOLController extends Controller {
             subFuncs.put("测试", MethodPointerUtil.getMethodwithTwoParams(INSTANCE, "test",GroupMessageEvent.class,String[].class));
 //                Longqbot.INSTANCE.getLogger().info(String.valueOf(subFuncs.size()));
         }catch (Exception e){
-            Longqbot.INSTANCE.getLogger().error(e);
+            Longqbot.INSTANCE.getLogger().error(e.toString());
         }
         heroCount = LOLConfig.INSTANCE.getHeroList().size();
     }
@@ -66,7 +67,7 @@ public class LOLController extends Controller {
                 try {
                     subfunc.invoke(INSTANCE, event, args);
                 }catch (Exception e){
-                    Longqbot.INSTANCE.getLogger().error(e.getMessage());
+                    Longqbot.INSTANCE.getLogger().error(e.toString());
                 }
             }else{
 
@@ -78,17 +79,22 @@ public class LOLController extends Controller {
 
     @Override
     public void info(Event event, String[] args) {
+        //
         String help = LOLController.INSTANCE.getKeyword() + "功能介绍: ";
         for (String subFuncName : subFuncs.keySet()) {
             String discription;
+            //
             if(LOLConfig.INSTANCE.getFuncsDiscription().getOrDefault(subFuncName, null)==null){
                 discription = "暂无详细描述";
+                //
                 LOLConfig.INSTANCE.getFuncsDiscription().put(subFuncName, discription);
             }else{
+                //
                 discription = LOLConfig.INSTANCE.getFuncsDiscription().getOrDefault(subFuncName, "");
             }
             help += "\n" + subFuncName + ": " + discription;
         }
+        //
         ((GroupMessageEvent)event).getSubject().sendMessage(help); // 回复消息
     }
 
@@ -297,7 +303,7 @@ public class LOLController extends Controller {
                 heroCount = LOLConfig.INSTANCE.getHeroList().size();
                 event.getSubject().sendMessage("英雄列表更新完成, 现有英雄数量: " + LOLConfig.INSTANCE.getHeroList().size()); // 回复消息
             }catch (Exception e){
-                Longqbot.INSTANCE.getLogger().error(e);
+                Longqbot.INSTANCE.getLogger().error(e.toString());
                 event.getSubject().sendMessage("英雄列表更新失败, 网络异常"); // 回复消息
             }
         }

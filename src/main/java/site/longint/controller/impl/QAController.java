@@ -24,7 +24,7 @@ public class QAController extends Controller {
         super("问答", false);
     }
 
-    void register() {
+    protected void register() {
         subFuncs = new LinkedHashMap<>();
         try {
 //            subFuncs.put("测试", MethodPointerUtil.getMethodwithTwoParams(INSTANCE, "test", GroupMessageEvent.class, String[].class));
@@ -38,7 +38,7 @@ public class QAController extends Controller {
             subFuncs.put("条目", MethodPointerUtil.getMethodwithTwoParams(INSTANCE, "quest", GroupMessageEvent.class, String[].class));
 //                Longqbot.INSTANCE.getLogger().info(String.valueOf(subFuncs.size()));
         } catch (Exception e) {
-            Longqbot.INSTANCE.getLogger().error(e);
+            Longqbot.INSTANCE.getLogger().error(e.toString());
         }
     }
 
@@ -65,7 +65,7 @@ public class QAController extends Controller {
                 try {
                     subFunc.invoke(INSTANCE, event, args);
                 } catch (Exception e) {
-                    Longqbot.INSTANCE.getLogger().error(e.getMessage());
+                    Longqbot.INSTANCE.getLogger().error(e.toString());
                 }
             }
             else
@@ -80,13 +80,17 @@ public class QAController extends Controller {
 
     @Override
     public void info(Event event, String[] args){
+        //
         String help = QAController.INSTANCE.getKeyword() + "功能介绍: ";
         for (String subFuncName : subFuncs.keySet()) {
             String discription;
+            //
             if(QAConfig.INSTANCE.getFuncsDiscription().getOrDefault(subFuncName, null)==null){
                 discription = "暂无详细描述";
+                //
                 QAConfig.INSTANCE.getFuncsDiscription().put(subFuncName, discription);
             }else{
+                //
                 discription = QAConfig.INSTANCE.getFuncsDiscription().getOrDefault(subFuncName, "");
             }
             help += "\n" + subFuncName + ": " + discription;
@@ -139,10 +143,10 @@ public class QAController extends Controller {
                 }
                 QAConfig.INSTANCE.getTipsAllowinGroup().get(event.getSubject().getId()).put(key, args[1]);
 
-                event.getSubject().sendMessage(String.format("问题<[%s]>添加成功, 序号: %d", args[1], key));
+                event.getSubject().sendMessage(String.format("问题<%s>添加成功, 序号: %d", args[1], key));
             }else{
                 Integer key = QAConfig.INSTANCE.getTipsMap().size();
-                event.getSubject().sendMessage(String.format("问题<[%s]>已存在, 序号: %d", args[1], key));
+                event.getSubject().sendMessage(String.format("问题<%s>已存在, 序号: %d", args[1], key));
             }
         }
         else
@@ -221,7 +225,7 @@ public class QAController extends Controller {
         if (QAConfig.INSTANCE.getTipsAllowinGroup().getOrDefault(event.getSubject().getId(), null)==null || QAConfig.INSTANCE.getTipsAllowinGroup().getOrDefault(event.getSubject().getId(), null).size()==0) {
             temp = "本群问答引用条目数为0";
         } else {
-            temp = "本群问答引用条目数为" + QAConfig.INSTANCE.getTipsAllowinGroup().getOrDefault(event.getSubject().getId(), null).size();
+            temp = String.format("本群引用了以下%d条问答条目: ", QAConfig.INSTANCE.getTipsAllowinGroup().getOrDefault(event.getSubject().getId(), null).size());
             for (Integer keyID : QAConfig.INSTANCE.getTipsAllowinGroup().getOrDefault(event.getSubject().getId(), null).keySet()) {
                 temp += "\n#" + keyID + ": " + QAConfig.INSTANCE.getTipsAllowinGroup().getOrDefault(event.getSubject().getId(), null).getOrDefault(keyID, "");
             }
@@ -278,34 +282,52 @@ public class QAController extends Controller {
         }
 
         if (args.length == 2) {
-            String[] keys = args[1].split(",");
-            ArrayList<Integer> keysSucc = new ArrayList<>();
             if (QAConfig.INSTANCE.getTipsAllowinGroup().getOrDefault(event.getSubject().getId(), null) == null) {
                 QAConfig.INSTANCE.getTipsAllowinGroup().put(event.getSubject().getId(), new LinkedHashMap<>());
             }
-            for (String key : keys) {
-                try {
+
+            String[] keys = args[1].split(",");
+            ArrayList<Integer> keysSucc = new ArrayList<>();
+            LinkedHashMap<Integer, String> temp = new LinkedHashMap<>(QAConfig.INSTANCE.getTipsAllowinGroup().get(event.getSubject().getId()));
+            try {
+                for (String key : keys) {
                     Integer keyID = Integer.valueOf(key);
                     String quest = QAConfig.INSTANCE.getTipsMap().getOrDefault(keyID, null);
-                    if (quest != null) {
-                        QAConfig.INSTANCE.getTipsAllowinGroup().get(event.getSubject().getId()).put(keyID, quest);
+                    if (quest != null
+                            && temp.getOrDefault(keyID, null)==null) {
+                        temp.put(keyID, quest);
                         keysSucc.add(keyID);
                     }
-                } catch (Exception e) {
-                    //
                 }
+//                https://blog.csdn.net/weixin_44777693/article/details/98610826
+                List<Map.Entry<Integer, String>> swapper =new ArrayList<Map.Entry<Integer, String>>(temp.entrySet());
+                swapper.sort(new Comparator<Map.Entry<Integer, String>>() {
+                    @Override
+                    public int compare(Map.Entry<Integer, String> o1, Map.Entry<Integer, String> o2) {
+                        // 比较, 默认升序, 返回值为正值则判定为逆序
+                        return o1.getKey() - o2.getKey();
+                    }
+                });
+                temp = new LinkedHashMap <Integer, String>();
+                for(Map.Entry<Integer,String> entity : swapper){
+                    temp.put(entity.getKey(), entity.getValue());
+                }
+                QAConfig.INSTANCE.getTipsAllowinGroup().put(event.getSubject().getId(), temp);
+            } catch (Exception e) {
+                Longqbot.INSTANCE.getLogger().warning(e.toString());
             }
             if (keysSucc.size() != 0) {
                 String msg = "成功引用以下问答条目";
                 for (Integer key : keysSucc) {
                     msg += "\n#" + key + ": " + QAConfig.INSTANCE.getTipsAllowinGroup().get(event.getSubject().getId()).get(key);
                 }
+                msg+="\n\n输入\n '对应问题描述语' \n或\n '#' + '对应阿拉伯数字' \n以获取对应序号条目的回答";
                 event.getSubject().sendMessage(new PlainText(msg)); // 回复消息
             }else{
-                event.getSubject().sendMessage(new PlainText("未识别到目前不被本群引用的新条目")); // 回复消息
+                event.getSubject().sendMessage(new PlainText("未识别到目前不被本群引用的新条目, 发送 '列表' 以查看本群问答条目")); // 回复消息
             }
         }else {
-            event.getSubject().sendMessage("正确格式: #问答 引用 一组用英文逗号分割的数字,如 0,1,2"); // 回复消息
+            event.getSubject().sendMessage("正确格式: #问答 引用 <一组用英文逗号分割的数字, 如: 0,1,2>"); // 回复消息
         }
     }
 

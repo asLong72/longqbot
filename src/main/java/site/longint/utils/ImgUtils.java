@@ -9,13 +9,18 @@ import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import site.longint.DAO.ImageIndicator;
 import site.longint.Longqbot;
+import site.longint.configs.QuotationConfig;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.*;
+import java.net.URI;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
+// 图像处理工具类
 public class ImgUtils {
-    public static Image getImagefromImageIndicator(ImageIndicator ii, Contact aim, Bot bot) throws FileNotFoundException {
+    public static Image getImagefromImageIndicator(String tag, String subtag,ImageIndicator ii, Contact aim, Bot bot) throws FileNotFoundException {
         String imgid = ii.getImgid();
         String nativeURI = ii.getNativeURI();
         Integer width = ii.getWidth();
@@ -24,13 +29,19 @@ public class ImgUtils {
             Image.Builder builder = Image.Builder.newBuilder(imgid);
             builder.setWidth(width);
             builder.setHeight(height);
-            builder.setType(ImageType.PNG);
+            builder.setType(ImageType.match(ii.getType()));
 
             Image img = builder.build();
             if(Image.isUploaded(img, bot)){
                 return img;
             }else{
-                return uploadNativeImg(aim, new FileInputStream(new File(nativeURI)));
+                // workdir: Disk:/a/b/c
+                // DataFolderPath: Disk:/a/b/c/data/xxx
+                // relative: data/xxx/img/xxx
+                img = uploadNativeImg(aim, new FileInputStream(new File(Paths.get("").toAbsolutePath().toString() + "/" + nativeURI)));
+                ii = new ImageIndicator(img, nativeURI);
+                QuotationConfig.INSTANCE.getQuotationsMap().get(tag).put(subtag, ii);
+                return img;
             }
         }
         return null;

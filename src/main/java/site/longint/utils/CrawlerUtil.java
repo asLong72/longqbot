@@ -8,6 +8,7 @@ import org.jsoup.select.Elements;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
+import site.longint.Longqbot;
 
 import java.io.*;
 import java.util.LinkedHashMap;
@@ -17,10 +18,9 @@ public class CrawlerUtil {
     public static final CrawlerUtil INSTANCE = new CrawlerUtil();
 
     CrawlerUtil(){
-        System.setProperty("webdriver.chrome.driver",
-                            "F:\\AboutPython\\Lib\\site-packages\\chromedriver\\chromedriver-116.exe");
     }
 
+    // 爬LOL英雄头像
     public LinkedHashMap<Integer, Map<String,String>> lolLengendsInfo(String folderPath) throws IOException, NullPointerException, InterruptedException {
         ChromeOptions options=new ChromeOptions();
         //设置 chrome 的无头模式
@@ -56,6 +56,7 @@ public class CrawlerUtil {
         return heroList;
     }
 
+    // 保存网络URL图像到本地文件
     public void saveFile(String imgURL,String savePath) throws IOException {
         Connection connection = Jsoup.connect(imgURL);
         Connection.Response response = connection.method(Connection.Method.GET).ignoreContentType(true).timeout(3*1000).execute();

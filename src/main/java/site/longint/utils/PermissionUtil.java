@@ -15,13 +15,13 @@ public class PermissionUtil {
         else
         {
             // 群主
-            if(state == 2 && user.getPermission().getLevel()>=2)
+            if(state == 2 && user.getPermission().getLevel()==2)
             {
                 Longqbot.INSTANCE.getLogger().warning("群主");
                 return Boolean.TRUE;
             }
             // 管理
-            else if(state == 3 && user.getPermission().getLevel()>=1)
+            else if(state == 3 && user.getPermission().getLevel()==1)
             {
                 Longqbot.INSTANCE.getLogger().warning("管理");
                 return Boolean.TRUE;
@@ -35,9 +35,9 @@ public class PermissionUtil {
             else
             {
                 // 群白名单检测
-                if(true)
+                if(Boolean.FALSE)
                 {
-                    return Boolean.FALSE;
+                    return Boolean.TRUE;
                 }
                 return Boolean.FALSE;
             }

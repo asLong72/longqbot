@@ -20,8 +20,6 @@ object BasicConfig : AutoSavePluginConfig("BasicConfig") { // 文件名为 Basic
     val groupEnableScripts: Map<Long,String> by value()
     @ValueDescription("disableScripts: 群禁用台词")
     val groupDisableScripts: Map<Long,String> by value()
-    @ValueDescription("groupWhiteList: 群内启用功能权限细分，0为不启用, 1仅自己(memberpermission==0为普通群员)")
+    @ValueDescription("groupWhiteList: 群内启用功能权限细分，0为不启用, 1仅自己(memberpermission==0为普通群员, 群员权限升序递增)")
     var groupWhiteList: Map<Long,Map<String,Int>> by value()
-    @ValueDescription("webdriverPath: 无头浏览器驱动文件地址")
-    val webdriverPath: String by value("F:\\AboutPython\\Lib\\site-packages\\chromedriver\\chromedriver.exe")
 }

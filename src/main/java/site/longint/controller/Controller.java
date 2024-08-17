@@ -26,7 +26,8 @@ public abstract class Controller {
         enable = false;
     }
 
-    public abstract void onCall(Event event, String[] arg);
+    protected abstract void register();
+    public abstract void onCall(Event event, String[] args);
     public abstract void info(Event event, String[] args);
 
     public Plugin getPlugin(){

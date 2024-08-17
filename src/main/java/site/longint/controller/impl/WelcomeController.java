@@ -20,15 +20,14 @@ import java.util.LinkedHashMap;
 public class WelcomeController extends Controller {
     public static final WelcomeController INSTANCE = new WelcomeController();
 
-    public LinkedHashMap<Long, Integer> coolDownTarget;
-
     public LinkedHashMap<Long, Integer> coolDownCount;
 
     public WelcomeController() {
         super("欢迎", false);
     }
 
-    void register() {
+    @Override
+    protected void register() {
         subFuncs = new LinkedHashMap<>();
         try{
             subFuncs.put("功能介绍", MethodPointerUtil.getMethodwithTwoParams(INSTANCE, "info", Event.class, String[].class));
@@ -37,10 +36,15 @@ public class WelcomeController extends Controller {
             subFuncs.put("状态", MethodPointerUtil.getMethodwithTwoParams(INSTANCE, "state", GroupMessageEvent.class, String[].class));
             subFuncs.put("欢迎", MethodPointerUtil.getMethodwithTwoParams(INSTANCE, "welcome", MemberJoinEvent.class, String[].class));
 
-            coolDownTarget = new LinkedHashMap<>(WelcomeConfig.INSTANCE.getGroupWelcomeCoolDown());
-            coolDownCount = new LinkedHashMap<>(coolDownTarget);
+//            coolDownCount = new LinkedHashMap<>(coolDownTarget);
+            // 重启插件时, 冷却cd重置
+            coolDownCount = new LinkedHashMap<>();
+            for (Long groupID : WelcomeConfig.INSTANCE.getGroupWelcomeCoolDownTarget().keySet()) {
+                Integer re_cd = WelcomeConfig.INSTANCE.getGroupWelcomeCoolDownTarget().get(groupID)/10;
+                coolDownCount.put(groupID, re_cd);
+            }
         }catch (Exception e){
-            Longqbot.INSTANCE.getLogger().error(e);
+            Longqbot.INSTANCE.getLogger().error(e.toString());
         }
     }
 
@@ -51,17 +55,21 @@ public class WelcomeController extends Controller {
             register();
         }
 
+        //
         Long groupID = 0L;
         if(event instanceof GroupMessageEvent){
             groupID = ((GroupMessageEvent)event).getSubject().getId();
         }else if(event instanceof MemberJoinEvent){
             groupID = ((MemberJoinEvent)event).getGroupId();
         }
+        //
         if(WelcomeConfig.INSTANCE.getGroupWelcomeScripts().getOrDefault(groupID,null)==null){
             WelcomeConfig.INSTANCE.getGroupWelcomeScripts().put(groupID, "\n欢迎进群, 输入 #帮助 获得本QQbot在本群的功能启用情况与使用说明");
         }
-        if(WelcomeConfig.INSTANCE.getGroupWelcomeCoolDown().getOrDefault(groupID,null)==null){
-            WelcomeConfig.INSTANCE.getGroupWelcomeCoolDown().put(groupID,0);
+        //
+        if(WelcomeConfig.INSTANCE.getGroupWelcomeCoolDownTarget().getOrDefault(groupID,null)==null){
+            WelcomeConfig.INSTANCE.getGroupWelcomeCoolDownTarget().put(groupID,0);
+            coolDownCount.put(groupID, 0);
         }
 
         if (args != null && args.length != 0) {
@@ -77,7 +85,7 @@ public class WelcomeController extends Controller {
                 try {
                     subFunc.invoke(INSTANCE, event, args);
                 } catch (Exception e) {
-                    Longqbot.INSTANCE.getLogger().error(e.getMessage());
+                    Longqbot.INSTANCE.getLogger().error(e.toString());
                 }
             }
         } else {
@@ -87,13 +95,17 @@ public class WelcomeController extends Controller {
 
     @Override
     public void info(Event event, String[] args){
+        //
         String help = WelcomeController.INSTANCE.getKeyword() + "功能介绍: ";
         for (String subFuncName : subFuncs.keySet()) {
             String discription;
+            //
             if(WelcomeConfig.INSTANCE.getFuncsDiscription().getOrDefault(subFuncName, null)==null){
                 discription = "暂无详细描述";
+                //
                 WelcomeConfig.INSTANCE.getFuncsDiscription().put(subFuncName, discription);
             }else{
+                //
                 discription = WelcomeConfig.INSTANCE.getFuncsDiscription().getOrDefault(subFuncName, "");
             }
             help += "\n" + subFuncName + ": " + discription;
@@ -129,8 +141,8 @@ public class WelcomeController extends Controller {
                 }
             } else if (args[1].equals("冷却")) {
                 if (args.length == 3) {
-                    if (WelcomeConfig.INSTANCE.getGroupWelcomeCoolDown().getOrDefault(event.getSubject().getId(), null) == null) {
-                        WelcomeConfig.INSTANCE.getGroupWelcomeCoolDown().put(event.getSubject().getId(), 0);
+                    if (WelcomeConfig.INSTANCE.getGroupWelcomeCoolDownTarget().getOrDefault(event.getSubject().getId(), null) == null) {
+                        WelcomeConfig.INSTANCE.getGroupWelcomeCoolDownTarget().put(event.getSubject().getId(), 0);
                     }
                     Integer cool;
                     try {
@@ -142,9 +154,12 @@ public class WelcomeController extends Controller {
                     }
 
                     Long groupID = event.getSubject().getId();
-                    WelcomeConfig.INSTANCE.getGroupWelcomeCoolDown().put(groupID, cool);
-                    coolDownCount.put(groupID, cool);
-                    coolDownTarget.put(groupID, cool);
+                    WelcomeConfig.INSTANCE.getGroupWelcomeCoolDownTarget().put(groupID, cool);
+                    // 不伴随本次修改重置冷却cd
+//                    coolDownCount.put(groupID, cool);
+                    if(coolDownCount.getOrDefault(groupID, -1)<0){
+                        coolDownCount.put(groupID, cool);
+                    }
                     event.getSubject().sendMessage(String.format("修改成功, 当前cd区间为: 0 ~ %d", cool)); // 回复消息
                 } else {
                     event.getSubject().sendMessage("格式: #欢迎 修改 冷却 <冷却区间最大值>"); // 回复消息
@@ -159,12 +174,13 @@ public class WelcomeController extends Controller {
     void state(GroupMessageEvent event, String[] args) {
         String msg = "";
         msg += "当前群聊新成员进群欢迎词: " + WelcomeConfig.INSTANCE.getGroupWelcomeScripts().getOrDefault(event.getSubject().getId(), "") + "\n\n";
-        msg += "当前群聊发送欢迎词冷却上限(按群聊消息数计): " + WelcomeConfig.INSTANCE.getGroupWelcomeCoolDown().getOrDefault(event.getSubject().getId(), 0) + "\n\n";
+        msg += "当前群聊发送欢迎词冷却上限(按群聊消息数计): " + WelcomeConfig.INSTANCE.getGroupWelcomeCoolDownTarget().getOrDefault(event.getSubject().getId(), 0) + "\n\n";
         msg += "当前群聊发送欢迎词冷却倒数(按群聊消息数计): " + coolDownCount.getOrDefault(event.getSubject().getId(), 0);
 
         event.getSubject().sendMessage(new PlainText(msg));
     }
 
+    //
     void coolDown(Event event, String[] args){
         Long groupID = 0L;
         if(event instanceof GroupMessageEvent){
@@ -184,7 +200,7 @@ public class WelcomeController extends Controller {
         Integer count = coolDownCount.getOrDefault(groupID,0);
         if(count==0){
             event.getGroup().sendMessage(new At(event.getMember().getId()).plus(new PlainText(WelcomeConfig.INSTANCE.getGroupWelcomeScripts().get(event.getGroupId()))));
-            coolDownCount.put(groupID,coolDownTarget.getOrDefault(groupID,0));
+            coolDownCount.put(groupID,WelcomeConfig.INSTANCE.getGroupWelcomeCoolDownTarget().getOrDefault(groupID,0));
         } else {
             coolDown(event, args);
         }
