@@ -10,6 +10,7 @@ import net.mamoe.mirai.console.plugin.jvm.JvmPluginDescriptionBuilder;
 import net.mamoe.mirai.event.Event;
 import net.mamoe.mirai.event.GlobalEventChannel;
 import net.mamoe.mirai.event.events.GroupMessageEvent;
+import net.mamoe.mirai.event.events.GroupMessagePostSendEvent;
 import net.mamoe.mirai.event.events.MemberJoinEvent;
 import net.mamoe.mirai.message.data.At;
 import net.mamoe.mirai.message.data.MessageChain;
@@ -94,6 +95,8 @@ public final class Longqbot extends JavaPlugin {
         configs.put("欢迎", WelcomeConfig.INSTANCE);
         //1.2
         configs.put("反广告", AdAntiConfig.INSTANCE);
+        //1.3
+        configs.put("AI", AIConfig.INSTANCE);
         for (AutoSavePluginConfig cfg : configs.values()) {
             INSTANCE.reloadPluginConfig(cfg);
         }
@@ -117,6 +120,8 @@ public final class Longqbot extends JavaPlugin {
         funcs.put(WelcomeController.INSTANCE.getKeyword(), WelcomeController.INSTANCE);
         // 1.2
         funcs.put(AdAntiController.INSTANCE.getKeyword(), AdAntiController.INSTANCE);
+        // 1.3
+        funcs.put(AIController.INSTANCE.getKeyword(), AIController.INSTANCE);
         //
         LinkedHashMap<String, Boolean> funcsState = new LinkedHashMap<>(BasicConfig.INSTANCE.getFunctionLoad());
         for (String funcKeyword : funcs.keySet()) {
@@ -126,6 +131,8 @@ public final class Longqbot extends JavaPlugin {
         // eventListener
         GlobalEventChannel.INSTANCE.parentScope(INSTANCE).subscribeAlways(GroupMessageEvent.class, this::GroupMSGListener);
         GlobalEventChannel.INSTANCE.parentScope(INSTANCE).subscribeAlways(MemberJoinEvent.class, this::GroupJoinListener);
+        // bot 真实发送到群的消息(无论哪个功能), 统一记录供 AI 上下文使用
+        GlobalEventChannel.INSTANCE.parentScope(INSTANCE).subscribeAlways(GroupMessagePostSendEvent.class, AIController::onBotSent);
 
         // finish!
         Longqbot.INSTANCE.getLogger().info("plugin loaded");
@@ -161,6 +168,9 @@ public final class Longqbot extends JavaPlugin {
 //            event.getSubject().sendMessage("Hello!"); // 回复消息
             String[] args = {"欢迎", "冷却"};
             callFunc(event,args);
+
+            // AI: 记录该群消息, 供AI上下文使用(仅AI启用群生效)
+            AIController.record(event);
 
             char first = msg.charAt(0);
 //            char last = msg.charAt(msg.length()-1);
@@ -211,7 +221,8 @@ public final class Longqbot extends JavaPlugin {
                     // 群内功能启用
                     if((args.length == 2||args.length == 3)&&args[0].equals("启用")&&event.getSender().getId()==BasicConfig.INSTANCE.getSuperAdmin())
                     {
-                        if(funcs.getOrDefault(args[1], null) == null){
+                        String realKey = resolveFuncKey(args[1]);
+                        if(realKey == null){
                             event.getSubject().sendMessage(String.format("%s功能不存在", args[1]));
                             return;
                         }
@@ -232,9 +243,9 @@ public final class Longqbot extends JavaPlugin {
                         if(BasicConfig.INSTANCE.getGroupWhiteList().getOrDefault(event.getSubject().getId(), null) == null){
                             BasicConfig.INSTANCE.getGroupWhiteList().put(event.getSubject().getId(), new LinkedHashMap<>());
                         }
-                        BasicConfig.INSTANCE.getGroupWhiteList().get(event.getSubject().getId()).put(args[1],state);
+                        BasicConfig.INSTANCE.getGroupWhiteList().get(event.getSubject().getId()).put(realKey,state);
 
-                        String report = args[1] + "功能已启用";
+                        String report = realKey + "功能已启用";
                         if(state==1){
                             report += ", 部分功能权限模式为: 仅允许 bot超级管理 \\ 群白名单";
                         }else if(state==2){
@@ -249,15 +260,16 @@ public final class Longqbot extends JavaPlugin {
                     else if(args.length == 2 && args[0].equals("禁用"))
                     {
                         //
-                        if(funcs.getOrDefault(args[1], null) == null){
+                        String realKey = resolveFuncKey(args[1]);
+                        if(realKey == null){
                             event.getSubject().sendMessage(String.format("%s功能不存在", args[1]));
                         }else{
                             if(BasicConfig.INSTANCE.getGroupWhiteList().getOrDefault(event.getSubject().getId(), null) == null){
                                 BasicConfig.INSTANCE.getGroupWhiteList().put(event.getSubject().getId(), new LinkedHashMap<>());
                             }
-                            BasicConfig.INSTANCE.getGroupWhiteList().get(event.getSubject().getId()).put(args[1],0);
+                            BasicConfig.INSTANCE.getGroupWhiteList().get(event.getSubject().getId()).put(realKey,0);
 
-                            event.getSubject().sendMessage(String.format("%s功能已禁用", args[1]));
+                            event.getSubject().sendMessage(String.format("%s功能已禁用", realKey));
                         }
                     }
                 }
@@ -266,6 +278,13 @@ public final class Longqbot extends JavaPlugin {
             }
             else
             {
+                // AI: 被@触发(需群白名单["AI"]>0)
+                if(AIController.isGroupAIEnabled(event.getSubject().getId())
+                        && AIController.containsAtBot(event))
+                {
+                    AIController.INSTANCE.onGroupAt(event);
+                    return;
+                }
                 //
                 if(msg.equals("列表"))
                 {
@@ -331,6 +350,15 @@ public final class Longqbot extends JavaPlugin {
         }
     }
 
+    /** 在已注册功能中按忽略大小写查找真实功能名(如 "ai" -> "AI"); 找不到返回 null */
+    static String resolveFuncKey(String name) {
+        if (name == null) return null;
+        for (String k : funcs.keySet()) {
+            if (k.equalsIgnoreCase(name)) return k;
+        }
+        return null;
+    }
+
     /* 在此callFunc函数内先剔除功能名参数, 再传入功能调用 */
     Boolean callFunc(Event event, String[] args){
 //        Longqbot.INSTANCE.getLogger().warning(args[0]);
@@ -347,10 +375,11 @@ public final class Longqbot extends JavaPlugin {
             BasicConfig.INSTANCE.getGroupWhiteList().put(((GroupMessageEvent)event).getSubject().getId(), new LinkedHashMap<>());
         }
 
-        Controller funcOnCall = funcs.getOrDefault(args[0], null);
+        String realKey = resolveFuncKey(args[0]);
+        Controller funcOnCall = (realKey == null) ? null : funcs.get(realKey);
 //        Longqbot.INSTANCE.getLogger().warning("func name: " + args[0]);
         // && BasicConfig.INSTANCE.getFunctionLoad().getOrDefault(args[0],true)
-        if(funcOnCall!=null && BasicConfig.INSTANCE.getGroupWhiteList().get(subjectID).getOrDefault(args[0], 0)>0){
+        if(funcOnCall!=null && BasicConfig.INSTANCE.getGroupWhiteList().get(subjectID).getOrDefault(realKey, 0)>0){
             // !!!
             args = Arrays.copyOfRange(args, 1, args.length);
             funcOnCall.onCall(event, args);
